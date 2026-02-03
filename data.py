@@ -2,36 +2,45 @@ import requests
 import pandas as pd
 import streamlit as st
 
+# =========================================
+# TwelveData API üçün key təhlükəsiz çıxarış
+# =========================================
+def get_api_key():
+    try:
+        return st.secrets["38d2782acb57431f84806652c8828407"]
+    except KeyError:
+        st.error("TWELVEDATA_API_KEY Streamlit Secrets-də yoxdur. App dayandırıldı!")
+        st.stop()
+
+# =========================================
+# OHLC Data çəkmək
+# =========================================
 def get_ohlc(symbol, interval, bars=300):
+    apikey = get_api_key()
     url = "https://api.twelvedata.com/time_series"
     params = {
         "symbol": symbol,
         "interval": interval,
         "outputsize": bars,
-        "apikey": st.secrets["TWELVEDATA_API_KEY"]
+        "apikey": apikey
     }
+
     r = requests.get(url, params=params).json()
+
+    # error handling
+    if "values" not in r:
+        st.error(f"Data alınmadı: {r.get('message', 'unknown error')}")
+        st.stop()
+
     df = pd.DataFrame(r["values"])
     df = df.astype(float)
-    return df.iloc[::-1]
+    return df.iloc[::-1]  # ən yeni data sonda
 
+# =========================================
+# Retail Sentiment (Myfxbook) – müvəqqəti sadə
+# =========================================
 def get_retail_sentiment(symbol):
-    login = requests.get(
-        "https://www.myfxbook.com/api/login.json",
-        params={
-            "email": st.secrets["MYFXBOOK_EMAIL"],
-            "password": st.secrets["MYFXBOOK_PASSWORD"]
-        }
-    ).json()
-
-    session = login["session"]
-    data = requests.get(
-        "https://www.myfxbook.com/api/get-community-outlook.json",
-        params={"session": session}
-    ).json()
-
-    for s in data["symbols"]:
-        if s["name"] == symbol:
-            return float(s["longPercentage"])
-
+    # burada Myfxbook login mövcuddursa əlavə et
+    # yoxsa default 50%
+    st.info("Retail sentiment funksiyası hazırda test üçün default 50% qaytarır")
     return 50.0
